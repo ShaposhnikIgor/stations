@@ -1,0 +1,27 @@
+# Distance Network Map
+
+stations:
+beginning,0,0
+near,1,0
+far,1,3
+terminus,0,3
+connections:
+beginning-near
+beginning-terminus
+near-far
+terminus-far
+
+# 20 trains from beginning to terminus
+
+# T1-terminus T2-near
+# T2-far T3-terminus T4-near
+# T2-terminus T4-far T5-terminus T6-near
+# T4-terminus T6-far T7-terminus T8-near
+# T6-terminus T8-far T9-terminus T10-near
+# T8-terminus T10-far T11-terminus T12-near
+# T10-terminus T12-far T13-terminus T14-near
+# T12-terminus T14-far T15-terminus T16-near
+# T14-terminus T16-far T17-terminus T18-near
+# T16-terminus T18-far T19-terminus
+# T18-terminus T20-terminus
+

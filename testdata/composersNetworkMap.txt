@@ -1,0 +1,28 @@
+# Composers network Map
+
+stations:
+beethoven,1,6
+verdi,7,1
+albinoni,1,1
+handel,3,14
+mozart,14,9
+part,10,0
+
+connections:
+beethoven-handel
+handel-mozart
+beethoven-verdi
+verdi-part
+verdi-albinoni
+beethoven-albinoni
+albinoni-mozart
+mozart-part
+
+# 9 trains between beethoven and part
+
+# T1-verdi T3-handel
+# T1-part T2-verdi T3-mozart T5-handel
+# T2-part T3-part T4-verdi T5-mozart T7-handel
+# T4-part T5-part T6-verdi T7-mozart T9-handel
+# T6-part T7-part T8-verdi T9-mozart
+# T8-part T9-part

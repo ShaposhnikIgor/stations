@@ -1,0 +1,27 @@
+# Numbers Network Map
+
+stations:
+one,1,1
+two,2,2
+three,3,3
+four,4,4
+five,5,5
+six,6,6
+
+connections:
+two-three
+five-one
+three-one
+two-five
+one-four
+six-two
+one-six
+
+# 4 trains between two and four
+
+# T1-three
+# T1-one T2-three
+# T1-four T2-one T3-three
+# T2-four T3-one T4-three
+# T3-four T4-one
+# T4-four
