@@ -24,9 +24,17 @@ func ParseNetworkMap(filePath string) ([]Station, []Connection, error) {
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if len(line) == 0 || strings.HasPrefix(line, "#") {
+
+		// Удаляем комментарии из строки
+		if hashIndex := strings.Index(line, "#"); hashIndex != -1 {
+			line = strings.TrimSpace(line[:hashIndex])
+		}
+
+		// Пропускаем пустые строки после удаления комментариев
+		if len(line) == 0 {
 			continue
 		}
+
 		if line == "stations:" {
 			mode = "stations"
 			stationsSectionFound = true
