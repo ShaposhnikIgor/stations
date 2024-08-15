@@ -46,12 +46,23 @@ func (pq *PriorityQueue) Pop() interface{} {
 	return node
 }
 
-// Heuristic function for A* (using Manhattan distance)
+// // Station represents a point on the graph with coordinates (for heuristic calculation).
+// type Station struct {
+// 	X, Y int
+// }
+
+// // Graph represents the train network graph.
+// type Graph struct {
+// 	AdjList  map[string][]string
+// 	Stations map[string]Station
+// }
+
+// Heuristic function for A* (using Manhattan distance).
 func heuristic(from, to Station) int {
 	return int(math.Abs(float64(from.X-to.X)) + math.Abs(float64(from.Y-to.Y)))
 }
 
-// A* search algorithm
+// AStarSearch algorithm finds the shortest path using A* search algorithm.
 func AStarSearch(graph *Graph, start, goal string) ([]string, error) {
 	goalStation := graph.Stations[goal]
 
@@ -90,7 +101,7 @@ func AStarSearch(graph *Graph, start, goal string) ([]string, error) {
 	return nil, fmt.Errorf("no path found from %s to %s", start, goal)
 }
 
-// BFS algorithm for comparison or fallback
+// BFS algorithm for comparison or fallback.
 func BFS(graph *Graph, start, goal string) ([]string, error) {
 	visited := make(map[string]bool)
 	queue := list.New()
@@ -123,7 +134,7 @@ func BFS(graph *Graph, start, goal string) ([]string, error) {
 	return nil, fmt.Errorf("no path found from %s to %s", start, goal)
 }
 
-// Hybrid algorithm combining BFS and A*
+// HybridSearch combines BFS and A* to find paths based on the number of trains.
 func HybridSearch(graph *Graph, start, goal string, numTrains int) ([]string, error) {
 	if numTrains > 5 { // Example condition to switch algorithms
 		return AStarSearch(graph, start, goal)
@@ -131,17 +142,18 @@ func HybridSearch(graph *Graph, start, goal string, numTrains int) ([]string, er
 	return BFS(graph, start, goal)
 }
 
+// MoveTrains simulates the movement of trains from a start to an end station.
 func MoveTrains(graph *Graph, startStation, endStation string, numTrains int) {
-	trains := make(map[string]string)          // Сопоставление поезда с его текущей станцией
-	previousStation := make(map[string]string) // Хранение предыдущих станций поездов
+	trains := make(map[string]string)          // Map train ID to its current station
+	previousStation := make(map[string]string) // Store previous station of trains
 
 	for i := 1; i <= numTrains; i++ {
 		trainID := fmt.Sprintf("T%d", i)
 		trains[trainID] = startStation
-		previousStation[trainID] = "" // Изначально у поезда нет предыдущей станции
+		previousStation[trainID] = "" // Initially, the train has no previous station
 	}
 
-	// Карта занятости станций
+	// Station occupation map
 	occupiedStations := make(map[string]bool)
 
 	turns := 0
@@ -150,46 +162,67 @@ func MoveTrains(graph *Graph, startStation, endStation string, numTrains int) {
 		turnMovement := []string{}
 		done := true
 
-		// Очистка карты занятости станций
+		// Clear station occupation map, except for the end station
 		for k := range occupiedStations {
-			delete(occupiedStations, k)
+			if k != endStation {
+				delete(occupiedStations, k)
+			}
 		}
 
-		// Перемещение каждого поезда
-		for trainID, currentStation := range trains {
+		// Move each train in order
+		for i := 1; i <= numTrains; i++ {
+			trainID := fmt.Sprintf("T%d", i)
+			currentStation := trains[trainID]
+
 			if currentStation == endStation {
-				continue // Если поезд уже на конечной станции, он больше не двигается
+				continue // If the train has reached the destination, it no longer moves
 			}
 
-			// Находим путь от текущей станции до конечной
+			// Find path from current station to the destination
 			path, err := HybridSearch(graph, currentStation, endStation, numTrains)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				os.Exit(1)
 			}
 
-			// Следующая станция на пути
-			nextStation := path[1] // Путь начинается с текущей станции, поэтому следующая - это вторая
+			// Check for alternative paths if the next station is occupied
+			nextStation := path[1]
+			if (nextStation != endStation && occupiedStations[nextStation]) || nextStation == previousStation[trainID] {
+				// Attempt to find an alternative path
+				for _, alternativeStation := range graph.AdjList[currentStation] {
+					if !occupiedStations[alternativeStation] && alternativeStation != previousStation[trainID] {
+						// Find a new path from the alternative station to the destination
+						alternativePath, err := HybridSearch(graph, alternativeStation, endStation, numTrains)
+						if err == nil && len(alternativePath) > 1 {
+							nextStation = alternativeStation
+							path = alternativePath
+							break
+						}
+					}
+				}
+			}
 
-			// Проверяем занята ли станция и не является ли она предыдущей
-			if !occupiedStations[nextStation] && nextStation != previousStation[trainID] {
+			// Move the train to the next station if it's not occupied and not the previous station, except at the end station
+			if (!occupiedStations[nextStation] || nextStation == endStation) && nextStation != previousStation[trainID] {
 				previousStation[trainID] = currentStation
 				trains[trainID] = nextStation
 				turnMovement = append(turnMovement, fmt.Sprintf("%s-%s", trainID, nextStation))
-				occupiedStations[nextStation] = true // Станция занята
+				if nextStation != endStation {
+					occupiedStations[nextStation] = true // Mark the station as occupied unless it's the end station
+				}
 				done = false
 			} else {
-				// Станция занята или это предыдущая станция, ждём
+				// Station is occupied or it's the previous station, the train waits
 				turnMovement = append(turnMovement, fmt.Sprintf("%s-%s", trainID, currentStation))
 			}
 		}
 
-		// Выводим движения текущего хода
+		// Print movements of the current turn
 		if len(turnMovement) > 0 {
 			fmt.Println(strings.Join(turnMovement, " "))
 		}
 
-		// Если все поезда достигли конечной станции, заканчиваем
+		// End if all trains have reached the destination
 		if done {
 			break
 		}
