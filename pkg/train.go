@@ -144,89 +144,112 @@ func HybridSearch(graph *Graph, start, goal string, numTrains int) ([]string, er
 
 // MoveTrains simulates the movement of trains from a start to an end station.
 func MoveTrains(graph *Graph, startStation, endStation string, numTrains int) {
-	trains := make(map[string]string)          // Map train ID to its current station
-	previousStation := make(map[string]string) // Store previous station of trains
+    trains := make(map[string]string)          // Map train ID to its current station
+    previousStation := make(map[string]string) // Store previous station of trains
+    movedAway := make(map[string]bool)         // Track if a train has moved away from the start
 
-	for i := 1; i <= numTrains; i++ {
-		trainID := fmt.Sprintf("T%d", i)
-		trains[trainID] = startStation
-		previousStation[trainID] = "" // Initially, the train has no previous station
-	}
+    // Initialize trains at the starting station
+    for i := 1; i <= numTrains; i++ {
+        trainID := fmt.Sprintf("T%d", i)
+        trains[trainID] = startStation
+        previousStation[trainID] = "" // Initially, the train has no previous station
+        movedAway[trainID] = false    // Track that the train has not moved away yet
+    }
 
-	// Station occupation map
-	occupiedStations := make(map[string]bool)
+    // Station occupation map
+    occupiedStations := make(map[string]bool)
 
-	turns := 0
-	for {
-		turns++
-		turnMovement := []string{}
-		done := true
+    turns := 0
+    for {
+        turns++
+        turnMovement := []string{}
+        done := true
 
-		// Clear station occupation map, except for the end station
-		for k := range occupiedStations {
-			if k != endStation {
-				delete(occupiedStations, k)
-			}
-		}
+        // Clear station occupation map, except for the end station
+        for k := range occupiedStations {
+            if k != endStation {
+                delete(occupiedStations, k)
+            }
+        }
 
-		// Move each train in order
-		for i := 1; i <= numTrains; i++ {
-			trainID := fmt.Sprintf("T%d", i)
-			currentStation := trains[trainID]
+        // Move each train in order
+        for i := 1; i <= numTrains; i++ {
+            trainID := fmt.Sprintf("T%d", i)
+            currentStation := trains[trainID]
 
-			if currentStation == endStation {
-				continue // If the train has reached the destination, it no longer moves
-			}
+            if currentStation == endStation {
+                continue // If the train has reached the destination, it no longer moves
+            }
 
-			// Find path from current station to the destination
-			path, err := HybridSearch(graph, currentStation, endStation, numTrains)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(1)
-			}
+            // Find path from current station to the destination
+            path, err := HybridSearch(graph, currentStation, endStation, numTrains)
+            if err != nil {
+                fmt.Fprintln(os.Stderr, err)
+                os.Exit(1)
+            }
 
-			// Check for alternative paths if the next station is occupied
-			nextStation := path[1]
-			if (nextStation != endStation && occupiedStations[nextStation]) || nextStation == previousStation[trainID] {
-				// Attempt to find an alternative path
-				for _, alternativeStation := range graph.AdjList[currentStation] {
-					if !occupiedStations[alternativeStation] && alternativeStation != previousStation[trainID] {
-						// Find a new path from the alternative station to the destination
-						alternativePath, err := HybridSearch(graph, alternativeStation, endStation, numTrains)
-						if err == nil && len(alternativePath) > 1 {
-							nextStation = alternativeStation
-							path = alternativePath
-							break
-						}
-					}
-				}
-			}
+            // Check for alternative paths if the next station is occupied
+            nextStation := path[1]
+            if (nextStation != endStation && occupiedStations[nextStation]) || nextStation == previousStation[trainID] {
+                // Attempt to find an alternative path
+                foundAlternative := false
+                for _, alternativeStation := range graph.AdjList[currentStation] {
+                    if !occupiedStations[alternativeStation] && alternativeStation != previousStation[trainID] {
+                        // Find a new path from the alternative station to the destination
+                        alternativePath, err := HybridSearch(graph, alternativeStation, endStation, numTrains)
+                        if err == nil && len(alternativePath) > 1 {
+                            nextStation = alternativeStation
+                            //path = alternativePath
+                            foundAlternative = true
+                            break
+                        }
+                    }
+                }
+                if !foundAlternative {
+                    // If no alternative path found, the train stays at its current station
+                    turnMovement = append(turnMovement, fmt.Sprintf("%s-%s", trainID, currentStation))
+                    continue
+                }
+            }
 
-			// Move the train to the next station if it's not occupied and not the previous station, except at the end station
-			if (!occupiedStations[nextStation] || nextStation == endStation) && nextStation != previousStation[trainID] {
-				previousStation[trainID] = currentStation
-				trains[trainID] = nextStation
-				turnMovement = append(turnMovement, fmt.Sprintf("%s-%s", trainID, nextStation))
-				if nextStation != endStation {
-					occupiedStations[nextStation] = true // Mark the station as occupied unless it's the end station
-				}
-				done = false
-			} else {
-				// Station is occupied or it's the previous station, the train waits
-				turnMovement = append(turnMovement, fmt.Sprintf("%s-%s", trainID, currentStation))
-			}
-		}
+            // Move the train to the next station if it's not occupied and not the previous station, except at the end station
+            if (!occupiedStations[nextStation] || nextStation == endStation) && nextStation != previousStation[trainID] {
+                previousStation[trainID] = currentStation
+                trains[trainID] = nextStation
+                if nextStation != startStation { // Only record if the train has moved away from the starting station
+                    turnMovement = append(turnMovement, fmt.Sprintf("%s-%s", trainID, nextStation))
+                    movedAway[trainID] = true // Mark the train as having moved away
+                }
+                if nextStation != endStation {
+                    occupiedStations[nextStation] = true // Mark the station as occupied unless it's the end station
+                }
+                done = false
+            } else {
+                // Station is occupied or it's the previous station, the train waits
+                turnMovement = append(turnMovement, fmt.Sprintf("%s-%s", trainID, currentStation))
+            }
+        }
 
-		// Print movements of the current turn
-		if len(turnMovement) > 0 {
-			fmt.Println(strings.Join(turnMovement, " "))
-		}
+        // Print movements of the current turn, but only if there are any movements
+        if len(turnMovement) > 0 {
+            // Only include movements for trains that have moved away from the starting station
+            filteredMovement := []string{}
+            for _, move := range turnMovement {
+                trainID := strings.Split(move, "-")[0]
+                if movedAway[trainID] {
+                    filteredMovement = append(filteredMovement, move)
+                }
+            }
+            if len(filteredMovement) > 0 {
+                fmt.Println(strings.Join(filteredMovement, " "))
+            }
+        }
 
-		// End if all trains have reached the destination
-		if done {
-			break
-		}
-	}
+        // End if all trains have reached the destination
+        if done {
+            break
+        }
+    }
 }
 
 func ValidateExtraArgs(args []string) {
