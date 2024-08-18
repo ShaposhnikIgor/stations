@@ -8,14 +8,14 @@ import (
 	"strings"
 )
 
-func ParseNetworkMap(filePath string) ([]Station, []Connection, error) {
+func ParseNetworkMap(filePath string) (map[string]Station, []Connection, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer file.Close()
 
-	var stations []Station
+	stations := make(map[string]Station)
 	var connections []Connection
 	scanner := bufio.NewScanner(file)
 	mode := ""
@@ -25,12 +25,41 @@ func ParseNetworkMap(filePath string) ([]Station, []Connection, error) {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 
-		// Удаляем комментарии из строки
 		if hashIndex := strings.Index(line, "#"); hashIndex != -1 {
 			line = strings.TrimSpace(line[:hashIndex])
 		}
 
-		// Пропускаем пустые строки после удаления комментариев
+		if len(line) == 0 {
+			continue
+		}
+
+		if line == "stations:" {
+			stationsSectionFound = true
+		}
+		if line == "connections:" {
+			connectionsSectionFound = true
+		}
+	}
+
+	// if err := scanner.Err(); err != nil {
+	// 	return nil, nil, err
+	// }
+
+	err = CheckSections(stationsSectionFound, connectionsSectionFound)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	file.Seek(0, 0) // Reset file pointer to the beginning
+	scanner = bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+
+		if hashIndex := strings.Index(line, "#"); hashIndex != -1 {
+			line = strings.TrimSpace(line[:hashIndex])
+		}
+
 		if len(line) == 0 {
 			continue
 		}
@@ -53,12 +82,17 @@ func ParseNetworkMap(filePath string) ([]Station, []Connection, error) {
 				return nil, nil, fmt.Errorf("error: invalid station format on line: %s", line)
 			}
 			name := strings.TrimSpace(parts[0])
+			// Check for duplicate station names
+			if _, exists := stations[name]; exists {
+				//fmt.Fprintf(os.Stderr, "Error: duplicate station name found: %s\n", name)
+				return nil, nil, fmt.Errorf("duplicate station name found: %s", name)
+			}
 			x, err1 := strconv.Atoi(strings.TrimSpace(parts[1]))
 			y, err2 := strconv.Atoi(strings.TrimSpace(parts[2]))
 			if err1 != nil || err2 != nil || x < 0 || y < 0 {
 				return nil, nil, fmt.Errorf("error: invalid station coordinates on line: %s", line)
 			}
-			stations = append(stations, Station{Name: name, X: x, Y: y})
+			stations[name] = Station{Name: name, X: x, Y: y}
 		case "connections":
 			parts := strings.Split(line, "-")
 			if len(parts) != 2 {
@@ -72,12 +106,12 @@ func ParseNetworkMap(filePath string) ([]Station, []Connection, error) {
 		}
 	}
 
-	err = CheckSections(stationsSectionFound, connectionsSectionFound)
-	if err != nil {
-		return nil, nil, err
-	}
+	// err = CheckSections(stationsSectionFound, connectionsSectionFound)
+	// if err != nil {
+	// 	return nil, nil, err
+	// }
 
-	err = CheckInvalidStationNames(stations)
+	err = CheckDuplicateStationNames(stations)
 	if err != nil {
 		return nil, nil, err
 	}

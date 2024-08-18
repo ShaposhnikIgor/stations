@@ -16,7 +16,7 @@ type Graph struct {
 	Stations map[string]Station
 }
 
-func NewGraph(connections []Connection, stations []Station) *Graph {
+func NewGraph(connections []Connection, stations map[string]Station) *Graph {
 	adjList := make(map[string][]string)
 	stationMap := make(map[string]Station)
 

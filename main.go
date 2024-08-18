@@ -13,6 +13,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	train.CheckArguments(os.Args)
+
 	filePath := os.Args[1]
 	startStation := os.Args[2]
 	endStation := os.Args[3]
@@ -26,12 +28,39 @@ func main() {
 		train.ValidateExtraArgs(os.Args[5:])
 	}
 
+	// Parse the network map first
 	stations, connections, err := train.ParseNetworkMap(filePath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		train.Error(err.Error())
+		os.Exit(0)
+	}
+
+	// Validate the existence of the start and end stations before doing anything else
+	train.ValidateStationExistence(stations, startStation, endStation)
+
+	// Check for invalid connections before creating the graph
+	err = train.CheckInvalidConnections(stations, connections)
+	if err != nil {
+		train.Error(err.Error())
 		os.Exit(1)
 	}
 
+	// Continue with the rest of the program only if the stations exist
 	graph := train.NewGraph(connections, stations)
 	train.MoveTrains(graph, startStation, endStation, numTrains)
+
+	// Check that the start and end stations are different
+	train.ValidateDifferentStations(startStation, endStation)
+
+	// Perform the search for the path between the stations
+	path, err := train.HybridSearch(graph, startStation, endStation, numTrains)
+	if err != nil {
+		train.Error(err.Error())
+	}
+
+	// Validate the existence of the path found
+	train.ValidatePathExistence(path, startStation, endStation)
+
+	// Validate the number of trains
+	train.ValidateTrainCount(numTrains, err)
 }
