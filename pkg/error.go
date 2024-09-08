@@ -1,7 +1,6 @@
 package train
 
 import (
-	"errors"
 	"fmt"
 	"os"
 )
@@ -22,11 +21,27 @@ func CheckArguments(args []string) {
 }
 
 // ValidateStationExistence checks if the start and end stations exist in the map.
-func ValidateStationExistence(stations map[string]Station, startStation, endStation string) {
-	if _, ok := stations[startStation]; !ok {
+func ValidateStationExistence(stations []Station, startStation, endStation string) {
+	startExists := false
+	endExists := false
+
+	// Iterate over the slice to find the stations
+	for _, station := range stations {
+		if station.Name == startStation {
+			startExists = true
+		}
+		if station.Name == endStation {
+			endExists = true
+		}
+	}
+
+	// Check if start station exists
+	if !startExists {
 		Error(fmt.Sprintf("Start station does not exist: %s", startStation))
 	}
-	if _, ok := stations[endStation]; !ok {
+
+	// Check if end station exists
+	if !endExists {
 		Error(fmt.Sprintf("End station does not exist: %s", endStation))
 	}
 }
@@ -39,7 +54,7 @@ func ValidateDifferentStations(startStation, endStation string) {
 }
 
 // ValidatePathExistence checks if there is a valid path between start and end stations.
-func ValidatePathExistence(path []string, startStation, endStation string) {
+func ValidatePathExistence(path [][]string, startStation, endStation string) {
 	if len(path) == 0 {
 		Error(fmt.Sprintf("No path found from %s to %s", startStation, endStation))
 	}
@@ -52,14 +67,19 @@ func ValidateTrainCount(numTrains int, err error) {
 	}
 }
 
-// CheckDuplicateRoutes validates that no duplicate connections exist, including reversed ones.
-func CheckDuplicateRoutes(connections []Connection) error {
+// CheckDuplicateRoutes checks for duplicate connections, including reversed ones, in a slice of connection pairs.
+func CheckDuplicateRoutes(connections [][]string) error {
 	seen := make(map[string]bool)
 	for _, conn := range connections {
-		forward := fmt.Sprintf("%s-%s", conn.From, conn.To)
-		reverse := fmt.Sprintf("%s-%s", conn.To, conn.From)
+		if len(conn) != 2 {
+			return fmt.Errorf("invalid connection format: %v", conn)
+		}
+		from := conn[0]
+		to := conn[1]
+		forward := fmt.Sprintf("%s-%s", from, to)
+		reverse := fmt.Sprintf("%s-%s", to, from)
 		if seen[forward] || seen[reverse] {
-			return fmt.Errorf("duplicate connection between %s and %s", conn.From, conn.To)
+			return fmt.Errorf("duplicate connection between %s and %s", from, to)
 		}
 		seen[forward] = true
 	}
@@ -77,13 +97,14 @@ func CheckSections(stationsSectionFound, connectionsSectionFound bool) error {
 	return nil
 }
 
-func CheckDuplicateStationNames(stations map[string]Station) error {
+// CheckDuplicateStationNames checks for duplicate station names in a slice of Station.
+func CheckDuplicateStationNames(stations []Station) error {
 	seen := make(map[string]bool)
-	for name := range stations {
+	for _, station := range stations {
+		name := station.Name
 		if seen[name] {
-			// Вывод ошибки в стандартный поток ошибок
-			fmt.Fprintf(os.Stderr, "Error: duplicate station name found: %s\n", name)
-			return errors.New("duplicate station name detected")
+			// Output error message to standard error output
+			return fmt.Errorf("duplicate station name detected: %s", name)
 		}
 		seen[name] = true
 	}
@@ -91,7 +112,7 @@ func CheckDuplicateStationNames(stations map[string]Station) error {
 }
 
 // CheckDuplicateCoordinates checks if any two stations have the same coordinates.
-func CheckDuplicateCoordinates(stations map[string]Station) error {
+func CheckDuplicateCoordinates(stations []Station) error {
 	coordsMap := make(map[string]bool)
 	for _, station := range stations {
 		coords := fmt.Sprintf("%d,%d", station.X, station.Y)
@@ -103,15 +124,26 @@ func CheckDuplicateCoordinates(stations map[string]Station) error {
 	return nil
 }
 
-// CheckInvalidConnections validates that all connections refer to existing stations.
-func CheckInvalidConnections(stations map[string]Station, connections []Connection) error {
-	for _, conn := range connections {
-		if _, ok := stations[conn.From]; !ok {
-			return fmt.Errorf("connection from non-existent station: %s", conn.From)
+func CheckConnectionsExist(stations []Station, connections [][]string) error {
+	// Helper function to check if a station exists in the slice
+	exists := func(name string) bool {
+		for _, station := range stations {
+			if station.Name == name {
+				return true
+			}
 		}
-		if _, ok := stations[conn.To]; !ok {
-			return fmt.Errorf("connection to non-existent station: %s", conn.To)
+		return false
+	}
+
+	// Iterate through the connections and validate station existence
+	for _, conn := range connections {
+		if !exists(conn[0]) {
+			return fmt.Errorf("Error: Connection from unknown station: %s", conn[0])
+		}
+		if !exists(conn[1]) {
+			return fmt.Errorf("Error: Connection to unknown station: %s", conn[1])
 		}
 	}
+
 	return nil
 }

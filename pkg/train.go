@@ -1,244 +1,350 @@
 package train
 
 import (
-	"container/heap"
-	"container/list"
 	"fmt"
 	"math"
 	"os"
-	"strings"
+	"slices"
+	"sort"
 )
 
-type PriorityQueue []*Node
+// BuildConnectionMap creates a map where each station is mapped to a slice of stations it is connected to.
+func BuildConnectionMap(stations []Station, connections [][]string) map[string][]string {
+	stationConnections := make(map[string][]string)
+	var connected []string
 
-type Node struct {
-	station  string
-	priority int
-	index    int
-}
-
-func (pq PriorityQueue) Len() int { return len(pq) }
-
-func (pq PriorityQueue) Less(i, j int) bool {
-	return pq[i].priority < pq[j].priority
-}
-
-func (pq PriorityQueue) Swap(i, j int) {
-	pq[i], pq[j] = pq[j], pq[i]
-	pq[i].index = i
-	pq[j].index = j
-}
-
-func (pq *PriorityQueue) Push(x interface{}) {
-	n := len(*pq)
-	node := x.(*Node)
-	node.index = n
-	*pq = append(*pq, node)
-}
-
-func (pq *PriorityQueue) Pop() interface{} {
-	old := *pq
-	n := len(old)
-	node := old[n-1]
-	old[n-1] = nil
-	node.index = -1
-	*pq = old[0 : n-1]
-	return node
-}
-
-// Heuristic function for A* (using Manhattan distance).
-func heuristic(from, to Station) int {
-	return int(math.Abs(float64(from.X-to.X)) + math.Abs(float64(from.Y-to.Y)))
-}
-
-// AStarSearch algorithm finds the shortest path using A* search algorithm.
-func AStarSearch(graph *Graph, start, goal string) ([]string, error) {
-	goalStation := graph.Stations[goal]
-
-	pq := &PriorityQueue{}
-	heap.Init(pq)
-	heap.Push(pq, &Node{station: start, priority: 0})
-
-	cameFrom := make(map[string]string)
-	costSoFar := make(map[string]int)
-	cameFrom[start] = ""
-	costSoFar[start] = 0
-
-	for pq.Len() > 0 {
-		current := heap.Pop(pq).(*Node).station
-
-		if current == goal {
-			path := []string{}
-			for current != "" {
-				path = append([]string{current}, path...)
-				current = cameFrom[current]
+	for _, stn := range stations {
+		for _, connection := range connections {
+			if connection[0] == stn.Name {
+				connected = append(connected, connection[1])
+			} else if connection[1] == stn.Name {
+				connected = append(connected, connection[0])
 			}
-			return path, nil
+		}
+		if connected != nil {
+			stationConnections[stn.Name] = connected
+			connected = nil
+		}
+	}
+
+	return stationConnections
+}
+
+// FindAllRoutes finds all possible routes from the start station to the end station.
+func FindAllPossibleRoutes(connections map[string][]string, startStation, endStation string) ([][]string, error) {
+	var allRoutes [][]string
+
+	var findPaths func(current, destination string, path []string)
+	findPaths = func(current, destination string, path []string) {
+		path = append(path, current)
+
+		if current == destination {
+			route := make([]string, len(path))
+			copy(route, path)
+			allRoutes = append(allRoutes, route[1:]) // Exclude the start station
+			return
 		}
 
-		for _, next := range graph.AdjList[current] {
-			newCost := costSoFar[current] + 1
-			if cost, ok := costSoFar[next]; !ok || newCost < cost {
-				costSoFar[next] = newCost
-				priority := newCost + heuristic(graph.Stations[next], goalStation)
-				heap.Push(pq, &Node{station: next, priority: priority})
-				cameFrom[next] = current
+		for _, neighbor := range connections[current] {
+			if !slices.Contains(path, neighbor) {
+				findPaths(neighbor, destination, path)
 			}
 		}
 	}
 
-	return nil, fmt.Errorf("no path found from %s to %s", start, goal)
+	findPaths(startStation, endStation, []string{})
+
+	ValidatePathExistence(allRoutes, startStation, endStation)
+
+	sort.Slice(allRoutes, func(i, j int) bool {
+		return len(allRoutes[i]) < len(allRoutes[j])
+	})
+
+	return allRoutes, nil
 }
 
-// BFS algorithm for comparison or fallback.
-func BFS(graph *Graph, start, goal string) ([]string, error) {
-	visited := make(map[string]bool)
-	queue := list.New()
-	queue.PushBack(start)
-	visited[start] = true
-	cameFrom := make(map[string]string)
-	cameFrom[start] = ""
+// FindAllRouteCombinations generates all possible combinations of non-redundant routes.
+func FindAllRouteCombinations(allRoutes [][]string) [][][]string {
+	var routeCombinations [][][]string
 
-	for queue.Len() > 0 {
-		current := queue.Remove(queue.Front()).(string)
+	for startIndex := 0; startIndex < len(allRoutes); startIndex++ {
+		currentCombination := [][]string{allRoutes[startIndex]}
+		generateCombinations(allRoutes, currentCombination, len(allRoutes), startIndex+1, &routeCombinations)
+	}
 
-		if current == goal {
-			path := []string{}
-			for current != "" {
-				path = append([]string{current}, path...)
-				current = cameFrom[current]
-			}
-			return path, nil
+	return routeCombinations
+}
+
+// generateCombinations recursively generates combinations of routes and checks for redundancy.
+func generateCombinations(allRoutes [][]string, currentCombination [][]string, totalRoutes int, currentIndex int, routeCombinations *[][][]string) {
+	if currentIndex == totalRoutes {
+		if isUniqueCombination(currentCombination, routeCombinations) {
+			*routeCombinations = append(*routeCombinations, currentCombination)
 		}
+	} else {
+		if canAddRoute(allRoutes[currentIndex], currentCombination) {
+			newCombination := append(currentCombination, allRoutes[currentIndex])
+			generateCombinations(allRoutes, newCombination, totalRoutes, currentIndex+1, routeCombinations)
+		}
+		generateCombinations(allRoutes, currentCombination, totalRoutes, currentIndex+1, routeCombinations)
+	}
+}
 
-		for _, next := range graph.AdjList[current] {
-			if !visited[next] {
-				queue.PushBack(next)
-				visited[next] = true
-				cameFrom[next] = current
-			}
+// isUniqueCombination checks if a given combination of routes is not redundant compared to existing combinations.
+func isUniqueCombination(newCombination [][]string, existingCombinations *[][][]string) bool {
+	if len(newCombination) == 1 {
+		return isUniqueSingleRoute(newCombination[0], existingCombinations)
+	}
+
+	newCombinationLengths := getRouteLengths(newCombination)
+	for _, existingCombination := range *existingCombinations {
+		existingCombinationLengths := getRouteLengths(existingCombination)
+		if areCombinationsEquivalent(newCombinationLengths, existingCombinationLengths) {
+			return false
 		}
 	}
 
-	return nil, fmt.Errorf("no path found from %s to %s", start, goal)
+	return true
 }
 
-// HybridSearch combines BFS and A* to find paths based on the number of trains.
-func HybridSearch(graph *Graph, start, goal string, numTrains int) ([]string, error) {
-	if numTrains > 5 { // Example condition to switch algorithms
-		return AStarSearch(graph, start, goal)
-	}
-	return BFS(graph, start, goal)
-}
-
-// MoveTrains simulates the movement of trains from a start to an end station.
-func MoveTrains(graph *Graph, startStation, endStation string, numTrains int) {
-	trains := make(map[string]string)          // Map train ID to its current station
-	previousStation := make(map[string]string) // Store previous station of trains
-	movedAway := make(map[string]bool)         // Track if a train has moved away from the start
-
-	// Initialize trains at the starting station
-	for i := 1; i <= numTrains; i++ {
-		trainID := fmt.Sprintf("T%d", i)
-		trains[trainID] = startStation
-		previousStation[trainID] = "" // Initially, the train has no previous station
-		movedAway[trainID] = false    // Track that the train has not moved away yet
-	}
-
-	// Station occupation map
-	occupiedStations := make(map[string]bool)
-
-	turns := 0
-	for {
-		turns++
-		turnMovement := []string{}
-		done := true
-
-		// Clear station occupation map, except for the end station
-		for k := range occupiedStations {
-			if k != endStation {
-				delete(occupiedStations, k)
+// isUniqueSingleRoute checks if a single route is unique within existing combinations.
+func isUniqueSingleRoute(route []string, existingCombinations *[][][]string) bool {
+	for _, combination := range *existingCombinations {
+		for _, existingRoute := range combination {
+			if len(route) == len(existingRoute) {
+				return false
 			}
 		}
+	}
+	return true
+}
 
-		// Move each train in order
-		for i := 1; i <= numTrains; i++ {
-			trainID := fmt.Sprintf("T%d", i)
-			currentStation := trains[trainID]
+// getRouteLengths returns a slice of lengths for each route in the combination.
+func getRouteLengths(routes [][]string) []int {
+	lengths := make([]int, len(routes))
+	for i, route := range routes {
+		lengths[i] = len(route)
+	}
+	return lengths
+}
 
-			if currentStation == endStation {
-				continue // If the train has reached the destination, it no longer moves
-			}
+// areCombinationsEquivalent checks if two combinations of routes have the same lengths, after sorting.
+func areCombinationsEquivalent(combinationA, combinationB []int) bool {
+	if len(combinationA) != len(combinationB) {
+		return false
+	}
+	sort.Ints(combinationA)
+	sort.Ints(combinationB)
 
-			// Find path from current station to the destination
-			path, err := HybridSearch(graph, currentStation, endStation, numTrains)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(1)
-			}
+	for i := range combinationA {
+		if combinationA[i] != combinationB[i] {
+			return false
+		}
+	}
+	return true
+}
 
-			// Check for alternative paths if the next station is occupied
-			nextStation := path[1]
-			if (nextStation != endStation && occupiedStations[nextStation]) || nextStation == previousStation[trainID] {
-				// Attempt to find an alternative path
-				foundAlternative := false
-				for _, alternativeStation := range graph.AdjList[currentStation] {
-					if !occupiedStations[alternativeStation] && alternativeStation != previousStation[trainID] {
-						// Find a new path from the alternative station to the destination
-						alternativePath, err := HybridSearch(graph, alternativeStation, endStation, numTrains)
-						if err == nil && len(alternativePath) > 1 {
-							nextStation = alternativeStation
-							//path = alternativePath
-							foundAlternative = true
-							break
-						}
-					}
-				}
-				if !foundAlternative {
-					// If no alternative path found, the train stays at its current station
-					turnMovement = append(turnMovement, fmt.Sprintf("%s-%s", trainID, currentStation))
+// canAddRoute checks if a route can be added to a combination without violating uniqueness.
+func canAddRoute(newRoute []string, currentCombination [][]string) bool {
+	endStation := os.Args[3]
+
+	for _, route := range currentCombination {
+		for _, stationA := range route {
+			for _, stationB := range newRoute {
+				if stationA == endStation || stationB == endStation {
 					continue
+				} else if stationA == stationB {
+					return false
 				}
 			}
-
-			// Move the train to the next station if it's not occupied and not the previous station, except at the end station
-			if (!occupiedStations[nextStation] || nextStation == endStation) && nextStation != previousStation[trainID] {
-				previousStation[trainID] = currentStation
-				trains[trainID] = nextStation
-				if nextStation != startStation { // Only record if the train has moved away from the starting station
-					turnMovement = append(turnMovement, fmt.Sprintf("%s-%s", trainID, nextStation))
-					movedAway[trainID] = true // Mark the train as having moved away
-				}
-				if nextStation != endStation {
-					occupiedStations[nextStation] = true // Mark the station as occupied unless it's the end station
-				}
-				done = false
-			} else {
-				// Station is occupied or it's the previous station, the train waits
-				turnMovement = append(turnMovement, fmt.Sprintf("%s-%s", trainID, currentStation))
-			}
-		}
-
-		// Print movements of the current turn, but only if there are any movements
-		if len(turnMovement) > 0 {
-			// Only include movements for trains that have moved away from the starting station
-			filteredMovement := []string{}
-			for _, move := range turnMovement {
-				trainID := strings.Split(move, "-")[0]
-				if movedAway[trainID] {
-					filteredMovement = append(filteredMovement, move)
-				}
-			}
-			if len(filteredMovement) > 0 {
-				fmt.Println(strings.Join(filteredMovement, " "))
-			}
-		}
-
-		// End if all trains have reached the destination
-		if done {
-			break
 		}
 	}
+	return true
+}
+
+// FindOptimalRoute determines the best route combination based on the train number and route lengths.
+func FindOptimalRoute(trainNumber int, routeCombinations [][][]string) (optimalRoute [][]string, optimalRouteInfo []int) {
+	routeLengths := calculateRouteLengths(routeCombinations)
+	shortestTurns := math.MaxInt
+
+	for index, lengths := range routeLengths {
+		turnsRequired := calculateTurnsForTrains(lengths, trainNumber)
+		if shortestTurns > turnsRequired {
+			optimalRoute = routeCombinations[index]
+			optimalRouteInfo = lengths
+			shortestTurns = turnsRequired
+		}
+	}
+	return optimalRoute, optimalRouteInfo
+}
+
+// calculateRouteLengths processes the route combinations and returns a slice of route lengths.
+func calculateRouteLengths(routeCombinations [][][]string) [][]int {
+	var routeLengths [][]int
+
+	for _, routes := range routeCombinations {
+		var lengths []int
+		for _, route := range routes {
+			lengths = append(lengths, len(route))
+		}
+		routeLengths = append(routeLengths, lengths)
+	}
+	return routeLengths
+}
+
+// calculateTurnsForTrains determines the number of turns required to utilize all trains on the routes.
+func calculateTurnsForTrains(routeLengths []int, trainNumber int) int {
+	trainCount := 0
+	turns := 0
+
+	for trainCount < trainNumber {
+		trainCount, turns = incrementTurn(trainCount, turns, routeLengths)
+	}
+	return turns
+}
+
+// incrementTurn increases the turn count and the number of trains placed on routes for the current turn.
+func incrementTurn(trainCount int, turns int, routeLengths []int) (int, int) {
+	placedTrains := 0
+	for _, length := range routeLengths {
+		if length <= turns {
+			placedTrains++
+		}
+	}
+
+	trainCount += placedTrains
+	return trainCount, turns + 1
+}
+
+func DisplayTrainMovements(routePlans [][]string, routeDurations []int, numTrains int) {
+	trainAllocation := allocateTrains(routeDurations, numTrains)
+	simulateAndDisplayMovements(trainAllocation, routeDurations, routePlans, numTrains)
+}
+
+func allocateTrains(routeDurations []int, numTrains int) map[int][]int {
+	turn := 1
+	trainsAllocated := 0
+	trainAllocation := make(map[int][]int, len(routeDurations))
+
+	for trainsAllocated < numTrains {
+		for routeIdx, duration := range routeDurations {
+			if duration <= turn {
+				trainsAllocated++
+				if trainsAllocated <= numTrains {
+					trainAllocation[routeIdx] = append(trainAllocation[routeIdx], trainsAllocated)
+				}
+			}
+		}
+		turn++
+	}
+	return trainAllocation
+}
+
+func simulateAndDisplayMovements(trainAllocation map[int][]int, routeDurations []int, routePlans [][]string, numTrains int) {
+	stationStatus := initializeStationStatus(routePlans)
+	trainsStatusMap := initializeTrainStatusMap(trainAllocation, routeDurations, routePlans, numTrains)
+	performTrainMovements(stationStatus, trainsStatusMap, routePlans, numTrains)
+}
+
+func initializeStationStatus(routePlans [][]string) map[string]int {
+	stationStatus := make(map[string]int)
+	for _, stations := range routePlans {
+		for _, station := range stations {
+			stationStatus[station] = 0 // All stations are initially available
+		}
+	}
+	return stationStatus
+}
+
+type trainStatus struct {
+	status               string
+	pathNumber           int
+	currentStationNumber int
+}
+
+func initializeTrainStatusMap(trainAllocation map[int][]int, routeDurations []int, routePlans [][]string, numTrains int) map[int]*trainStatus {
+	trainsStatusMap := make(map[int]*trainStatus)
+
+	for train := 1; train <= numTrains; train++ {
+		pathIdx := findPathForTrain(train, trainAllocation, routeDurations)
+		trainsStatusMap[train] = &trainStatus{
+			status:               "starting",
+			pathNumber:           pathIdx,
+			currentStationNumber: 0,
+		}
+	}
+	return trainsStatusMap
+}
+
+func findPathForTrain(train int, trainAllocation map[int][]int, routeDurations []int) int {
+	for pathIdx := 0; pathIdx < len(routeDurations); pathIdx++ {
+		if contains(trainAllocation[pathIdx], train) {
+			return pathIdx
+		}
+	}
+	return -1
+}
+
+func contains(slice []int, item int) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
+}
+
+func performTrainMovements(stationStatus map[string]int, trainsStatusMap map[int]*trainStatus, routePlans [][]string, numTrains int) {
+	var trainLog string
+	var oneLengthPathUsed bool
+	endStation := os.Args[3]
+
+	for trainsStatusMap[numTrains].status != "finished" {
+		for trainIdx := 1; trainIdx <= numTrains; trainIdx++ {
+			if trainStatus, exists := trainsStatusMap[trainIdx]; exists {
+				trainLog, oneLengthPathUsed = processTrainMovement(trainStatus, stationStatus, routePlans, trainIdx, endStation, trainLog, oneLengthPathUsed)
+			}
+		}
+		fmt.Println(trainLog)
+		trainLog = ""
+		oneLengthPathUsed = false
+	}
+}
+
+func processTrainMovement(trainStatus *trainStatus, stationStatus map[string]int, routePlans [][]string, trainIdx int, endStation, trainLog string, oneLengthPathUsed bool) (string, bool) {
+	if trainStatus.status == "moving" {
+		nextStation := routePlans[trainStatus.pathNumber][trainStatus.currentStationNumber+1]
+		if stationStatus[nextStation] == 0 {
+			currentStation := routePlans[trainStatus.pathNumber][trainStatus.currentStationNumber]
+			nextStation := routePlans[trainStatus.pathNumber][trainStatus.currentStationNumber+1]
+			stationStatus[currentStation] = 0
+			trainStatus.currentStationNumber++
+			trainLog += fmt.Sprintf("T%d-%v ", trainIdx, nextStation)
+			if nextStation == endStation {
+				trainStatus.status = "finished"
+				stationStatus[nextStation] = 0
+			} else {
+				stationStatus[nextStation] = 1
+			}
+		}
+	} else if trainStatus.status == "starting" {
+		startingStation := routePlans[trainStatus.pathNumber][0]
+		if stationStatus[startingStation] == 0 {
+			if startingStation == endStation {
+				if !oneLengthPathUsed {
+					trainStatus.status = "finished"
+					oneLengthPathUsed = true
+					trainLog += fmt.Sprintf("T%d-%v ", trainIdx, startingStation)
+				}
+				return trainLog, oneLengthPathUsed
+			} else {
+				stationStatus[startingStation] = 1
+				trainStatus.status = "moving"
+			}
+			trainLog += fmt.Sprintf("T%d-%v ", trainIdx, startingStation)
+		}
+	}
+	return trainLog, oneLengthPathUsed
 }
 
 func ValidateExtraArgs(args []string) {

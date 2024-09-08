@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+
 	"os"
 	train "stations/pkg"
+
 	"strconv"
 )
 
@@ -35,32 +37,28 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Validate the existence of the start and end stations before doing anything else
-	train.ValidateStationExistence(stations, startStation, endStation)
-
-	// Check for invalid connections before creating the graph
-	err = train.CheckInvalidConnections(stations, connections)
-	if err != nil {
-		train.Error(err.Error())
-		os.Exit(1)
-	}
-
-	// Continue with the rest of the program only if the stations exist
-	graph := train.NewGraph(connections, stations)
-	train.MoveTrains(graph, startStation, endStation, numTrains)
-
-	// Check that the start and end stations are different
 	train.ValidateDifferentStations(startStation, endStation)
 
-	// Perform the search for the path between the stations
-	path, err := train.HybridSearch(graph, startStation, endStation, numTrains)
-	if err != nil {
-		train.Error(err.Error())
+	// Validate the existence of the start and end stations before doing anything else
+	train.ValidateStationExistence(stations, startStation, endStation)
+	err2 := train.CheckConnectionsExist(stations, connections)
+	if err2 != nil {
+		train.Error(err2.Error())
+		os.Exit(0)
 	}
 
-	// Validate the existence of the path found
-	train.ValidatePathExistence(path, startStation, endStation)
+	stationConnections := train.BuildConnectionMap(stations, connections)
+	//fmt.Println(stationConnections)
 
-	// Validate the number of trains
-	train.ValidateTrainCount(numTrains, err)
+	allRoutes, err := train.FindAllPossibleRoutes(stationConnections, startStation, endStation)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		return
+	}
+
+	combinationRoutes := train.FindAllRouteCombinations(allRoutes)
+
+	bestRoute, bestRouteInfo := train.FindOptimalRoute(numTrains, combinationRoutes)
+
+	train.DisplayTrainMovements(bestRoute, bestRouteInfo, numTrains)
 }

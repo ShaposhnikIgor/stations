@@ -2,6 +2,8 @@ stations:
 # south stations
 waterloo  , 3 , 1
 victoria,6,7
+new, 1,2
+new2, 2,3
 
 # north stations
 euston,11,23
@@ -13,3 +15,4 @@ waterloo -victoria
 waterloo- euston  
 st_pancras-euston
 victoria-st_pancras
+new2 -new
