@@ -18,17 +18,17 @@ Welcome to the Train Route Planner project! This project helps you plan train ro
 - The program dynamically updates information about stations and trains, displaying all movements at each step.
 
 ## Table of Contents
-1. [1. Project Overview](#1.-project-overview)
+1. [1. Project Overview](#1-project-overview)
 2. [Features](#features)
 3. [How It Works](#how-it-works)
 4. [Installation and Setup](#installation-and-setup)
 5. [Checking Total Turns](#checking-total-turns)
 6. [Usage](#usage)
-7. [Command Line Arguments](#command-line-arguments)
+7. [Command Line Arguments](#7-command-line-arguments)
 8. [Detailed Process Flow](#detailed-process-flow)
 9. [Error Handling](#error-handling)
 10. [Program Structure](#program-structure)
-11. [11. Conclusion](#11.-conclusion)
+11. [11. Conclusion](#11-conclusion)
 
 
 ## 1. Project Overview
