@@ -20,7 +20,7 @@ Welcome to the Train Route Planner project! This project helps you plan train ro
 ## Table of Contents
 1. [Project Overview](#Project_Overview)
 2. [Features](#Features)
-3. [How It Works](How_It_Works)
+3. [How It Works](#How_It_Works)
 4. [Installation and Setup](#How_It_Works)
 5. [Checking Total Turns](#Checking_Total_Turns)
 6. [Usage](#Usage)
@@ -28,7 +28,7 @@ Welcome to the Train Route Planner project! This project helps you plan train ro
 8. [Detailed Process Flow](#Detailed_Process_Flow)
 9. [Error Handling](#Error_Handling)
 10. [Program Structure](#Program_Structure)
-11. [Conclusion](#Conclusion)
+11. [Conclusion](#conclusion)
 
 
 ## 1. Project Overview
