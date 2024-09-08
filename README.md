@@ -18,16 +18,16 @@ Welcome to the Train Route Planner project! This project helps you plan train ro
 - The program dynamically updates information about stations and trains, displaying all movements at each step.
 
 ## Table of Contents
-1. [Project Overview](#Project_Overview)
-2. [Features](#Features)
-3. [How It Works](#How_It_Works)
-4. [Installation and Setup](#How_It_Works)
-5. [Checking Total Turns](#Checking_Total_Turns)
-6. [Usage](#Usage)
-7. [Command Line Arguments](#Command_Line_Arguments)
-8. [Detailed Process Flow](#Detailed_Process_Flow)
-9. [Error Handling](#Error_Handling)
-10. [Program Structure](#Program_Structure)
+1. [Project Overview](#project-overview)
+2. [Features](#features)
+3. [How It Works](#how-it-works)
+4. [Installation and Setup](#installation-and-setup)
+5. [Checking Total Turns](#checking-total-turns)
+6. [Usage](#usage)
+7. [Command Line Arguments](#command-line-arguments)
+8. [Detailed Process Flow](#detailed-process-flow)
+9. [Error Handling](#error-handling)
+10. [Program Structure](#program-structure)
 11. [Conclusion](#conclusion)
 
 
@@ -86,7 +86,7 @@ Where:
 - londonNetwork.map is the file containing the network of stations and connections.
 - waterloo is the starting station.
 - st_pancras is the destination station.
-- 5 is the number of trains you want to plan for.
+- 2 is the number of trains you want to plan for.
 
 #### Example:
 Given a map file like:
