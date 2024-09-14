@@ -48,6 +48,7 @@ func FindAllPossibleRoutes(connections map[string][]string, startStation, endSta
 		for _, neighbor := range connections[current] {
 			if !slices.Contains(path, neighbor) {
 				findPaths(neighbor, destination, path)
+				//fmt.Println(connections[current])
 			}
 		}
 	}

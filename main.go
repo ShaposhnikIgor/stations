@@ -1,64 +1,53 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-
 	"os"
 	train "stations/pkg"
-
-	"strconv"
+	train2 "stations/pkg2"
 )
 
-func main() {
-	if len(os.Args) < 5 {
-		fmt.Fprintln(os.Stderr, "Error: Too few command line arguments")
-		os.Exit(1)
+func countStations(filePath string) (int, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	count := 0
+	for scanner.Scan() {
+		count++
+	}
+	if err := scanner.Err(); err != nil {
+		return 0, err
 	}
 
-	train.CheckArguments(os.Args)
+	return count, nil
+}
+
+func main() {
+	if len(os.Args) < 2 {
+		fmt.Println("Error: Please provide the file path to the station map.")
+		os.Exit(1)
+	}
 
 	filePath := os.Args[1]
-	startStation := os.Args[2]
-	endStation := os.Args[3]
-	numTrains, err := strconv.Atoi(os.Args[4])
-	if err != nil || numTrains <= 0 {
-		fmt.Fprintln(os.Stderr, "Error: Invalid number of trains")
+
+	// Counting the number of stations in the file
+	stationCount, err := countStations(filePath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Unable to count stations: %v\n", err)
 		os.Exit(1)
 	}
 
-	if len(os.Args) > 5 {
-		train.ValidateExtraArgs(os.Args[5:])
+	// Checking the number of stations and running the appropriate code
+	if stationCount > 5000 {
+		//fmt.Println("Launching Muvmain because the number of stations is greater than 5000")
+		train2.Muvmain()
+	} else {
+		//fmt.Println("Launching Logmain because the number of stations is less than or equal to 5000")
+		train.Logmain()
 	}
-
-	// Parse the network map first
-	stations, connections, err := train.ParseNetworkMap(filePath)
-	if err != nil {
-		train.Error(err.Error())
-		os.Exit(0)
-	}
-
-	train.ValidateDifferentStations(startStation, endStation)
-
-	// Validate the existence of the start and end stations before doing anything else
-	train.ValidateStationExistence(stations, startStation, endStation)
-	err2 := train.CheckConnectionsExist(stations, connections)
-	if err2 != nil {
-		train.Error(err2.Error())
-		os.Exit(0)
-	}
-
-	stationConnections := train.BuildConnectionMap(stations, connections)
-	//fmt.Println(stationConnections)
-
-	allRoutes, err := train.FindAllPossibleRoutes(stationConnections, startStation, endStation)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		return
-	}
-
-	combinationRoutes := train.FindAllRouteCombinations(allRoutes)
-
-	bestRoute, bestRouteInfo := train.FindOptimalRoute(numTrains, combinationRoutes)
-
-	train.DisplayTrainMovements(bestRoute, bestRouteInfo, numTrains)
 }
