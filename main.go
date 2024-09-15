@@ -42,6 +42,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Checking if the number of stations exceeds 10000
+	if stationCount > 10000 {
+		fmt.Println("Error: Map contains more than 10000 stations")
+		os.Exit(1)
+	}
+
 	// Checking the number of stations and running the appropriate code
 	if stationCount > 5000 {
 		//fmt.Println("Launching Muvmain because the number of stations is greater than 5000")
